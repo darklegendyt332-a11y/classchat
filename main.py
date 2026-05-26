@@ -14,8 +14,8 @@ from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.metrics import dp
 
-import datetime
 import socketio
+import datetime
 
 # =========================================
 # SOCKET
@@ -27,36 +27,39 @@ sio = socketio.Client()
 # WINDOW
 # =========================================
 
-Window.size = (360,640)
+Window.size = (360, 640)
 
 # =========================================
-# USERS
+# USER LOGIN
+# =========================================
+
+MY_NUMBER = "9999999999"
+
+# =========================================
+# CONTACTS
 # =========================================
 
 users = [
 
     {
-        "name":"Ali",
-        "msg":"Hello Bhai",
-        "time":"10:22 PM"
+        "name": "Ali",
+        "number": "1111111111",
+        "msg": "Hello",
+        "time": "10:22 PM"
     },
 
     {
-        "name":"Ahmed",
-        "msg":"Kaha ho",
-        "time":"9:10 PM"
+        "name": "Ahmed",
+        "number": "2222222222",
+        "msg": "Kaha ho",
+        "time": "9:10 PM"
     },
 
     {
-        "name":"Farhan",
-        "msg":"Class Chat",
-        "time":"8:55 PM"
-    },
-
-    {
-        "name":"Aman",
-        "msg":"Online",
-        "time":"Yesterday"
+        "name": "Aman",
+        "number": "3333333333",
+        "msg": "Online",
+        "time": "Yesterday"
     }
 
 ]
@@ -73,21 +76,32 @@ class Chat(MDApp):
 
         self.theme_cls.primary_palette = "Green"
 
-        # =========================
+        self.current_user = ""
+
+        self.current_number = ""
+
+        # =================================
         # SOCKET CONNECT
-        # =========================
+        # =================================
 
         try:
 
             sio.connect(
-                "http://192.168.43.55:5000"
+                "https://classchat-fog5.onrender.com"
             )
 
-            print("Socket Connected ✔")
+            print("Connected ✔")
+
+            sio.emit(
+                "join",
+                {
+                    "number": MY_NUMBER
+                }
+            )
 
         except Exception as e:
 
-            print("Socket Error ❌", e)
+            print("Socket Error:", e)
 
         self.screen = MDScreen()
 
@@ -96,7 +110,7 @@ class Chat(MDApp):
         return self.screen
 
     # =====================================
-    # HOME SCREEN
+    # HOME
     # =====================================
 
     def home(self):
@@ -104,7 +118,7 @@ class Chat(MDApp):
         self.screen.clear_widgets()
 
         layout = MDBoxLayout(
-            orientation='vertical'
+            orientation="vertical"
         )
 
         # =================================
@@ -115,7 +129,7 @@ class Chat(MDApp):
 
             adaptive_height=True,
 
-            padding=dp(15),
+            padding=15,
 
             spacing=10
 
@@ -125,9 +139,7 @@ class Chat(MDApp):
 
             text="Class Chat",
 
-            font_style="H4",
-
-            theme_text_color="Primary"
+            font_style="H4"
 
         )
 
@@ -151,7 +163,7 @@ class Chat(MDApp):
 
             size_hint_x=0.95,
 
-            pos_hint={"center_x":0.5}
+            pos_hint={"center_x": 0.5}
 
         )
 
@@ -169,8 +181,7 @@ class Chat(MDApp):
 
             item = TwoLineAvatarIconListItem(
 
-                text=
-                user["name"],
+                text=user["name"],
 
                 secondary_text=
                 user["msg"] +
@@ -178,6 +189,8 @@ class Chat(MDApp):
                 user["time"]
 
             )
+
+            item.number = user["number"]
 
             icon = IconLeftWidget(
                 icon="account-circle"
@@ -195,17 +208,13 @@ class Chat(MDApp):
 
         layout.add_widget(scroll)
 
-        # =================================
-        # FLOAT BUTTON
-        # =================================
-
         fab = MDFloatingActionButton(
 
             icon="message-plus",
 
             pos_hint={
-                "center_x":0.88,
-                "center_y":0.08
+                "center_x": 0.88,
+                "center_y": 0.08
             }
 
         )
@@ -215,15 +224,19 @@ class Chat(MDApp):
         self.screen.add_widget(fab)
 
     # =====================================
-    # OPEN CHAT SCREEN
+    # OPEN CHAT
     # =====================================
 
     def open_chat(self, instance):
 
+        self.current_user = instance.text
+
+        self.current_number = instance.number
+
         self.screen.clear_widgets()
 
         layout = MDBoxLayout(
-            orientation='vertical'
+            orientation="vertical"
         )
 
         # =================================
@@ -251,7 +264,7 @@ class Chat(MDApp):
         title = MDLabel(
 
             text=
-            instance.text +
+            self.current_user +
             " 🟢 Online",
 
             font_style="H6"
@@ -282,8 +295,7 @@ class Chat(MDApp):
 
         self.chat_area = MDLabel(
 
-            text=
-            "💬 Welcome To Class Chat\n\n",
+            text="💬 Welcome To Class Chat\n\n",
 
             halign="left"
 
@@ -299,35 +311,41 @@ class Chat(MDApp):
         # RECEIVE MESSAGE
         # =================================
 
-        @sio.on("message")
-        def on_message(data):
+        @sio.on("private_message")
+        def private_message(data):
 
             try:
+
+                sender = data["sender"]
+
+                text = data["text"]
+
+                time = data["time"]
 
                 self.chat_area.text += (
 
                     "👤 " +
 
-                    data["sender"] +
+                    sender +
 
                     ": " +
 
-                    data["text"] +
+                    text +
 
                     "   ✓✓   " +
 
-                    data["time"] +
+                    time +
 
                     "\n\n"
 
                 )
 
-            except:
+            except Exception as e:
 
-                print(data)
+                print(e)
 
         # =================================
-        # BOTTOM BAR
+        # BOTTOM
         # =================================
 
         bottom = MDBoxLayout(
@@ -360,16 +378,12 @@ class Chat(MDApp):
             icon="send"
         )
 
-        mic = MDFloatingActionButton(
-            icon="microphone"
-        )
-
         send.bind(
             on_press=self.send_message
         )
 
-        mic.bind(
-            on_press=self.voice_note
+        mic = MDFloatingActionButton(
+            icon="microphone"
         )
 
         bottom.add_widget(emoji)
@@ -399,36 +413,34 @@ class Chat(MDApp):
         if text.strip() == "":
             return
 
-        time = datetime.datetime.now().strftime("%I:%M %p")
+        time = datetime.datetime.now().strftime(
+            "%I:%M %p"
+        )
 
         data = {
 
-            "sender":"You",
+            "sender": MY_NUMBER,
 
-            "text":text,
+            "receiver": self.current_number,
 
-            "time":time
+            "text": text,
+
+            "time": time
 
         }
 
-        # =========================
+        # =================================
         # SEND TO SERVER
-        # =========================
+        # =================================
 
-        try:
+        sio.emit(
+            "private_message",
+            data
+        )
 
-            sio.emit(
-                "message",
-                data
-            )
-
-        except Exception as e:
-
-            print("Send Error:", e)
-
-        # =========================
+        # =================================
         # SHOW OWN MESSAGE
-        # =========================
+        # =================================
 
         self.chat_area.text += (
 
@@ -445,16 +457,6 @@ class Chat(MDApp):
         )
 
         self.msg.text = ""
-
-    # =====================================
-    # VOICE NOTE
-    # =====================================
-
-    def voice_note(self, obj):
-
-        self.chat_area.text += (
-            "🎤 Voice Note Sent ✓✓\n\n"
-        )
 
     # =====================================
     # BACK

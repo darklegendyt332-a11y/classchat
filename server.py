@@ -1,15 +1,47 @@
 from flask import Flask
-from flask_socketio import SocketIO, send
+from flask_socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
 
-socketio = SocketIO(app)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*"
+)
 
-@socketio.on("message")
-def handle(msg):
+# =====================================
+# USER JOIN
+# =====================================
 
-    print(msg)
+@socketio.on("join")
+def join(data):
 
-    send(msg, broadcast=True)
+    number = data["number"]
 
-socketio.run(app, host="0.0.0.0", port=5000)
+    join_room(number)
+
+    print(number, "joined")
+
+# =====================================
+# PRIVATE MESSAGE
+# =====================================
+
+@socketio.on("private_message")
+def private_message(data):
+
+    receiver = data["receiver"]
+
+    emit(
+        "private_message",
+        data,
+        room=receiver
+    )
+
+# =====================================
+# RUN
+# =====================================
+
+socketio.run(
+    app,
+    host="0.0.0.0",
+    port=5000
+)
