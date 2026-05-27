@@ -40,7 +40,7 @@ MY_NUMBER = "9261413387"
 users = [
 
     {
-        "name": "Farhan",
+        "name": "Ali",
         "number": "8052055136",
         "msg": "Online",
         "time": "Now"
@@ -88,7 +88,7 @@ class Chat(MDApp):
         try:
 
             sio.connect(
-                "https://classchat-fog5.onrender.com"
+                "http://192.168.43.55:5000"
             )
 
             sio.emit(

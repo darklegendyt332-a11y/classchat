@@ -88,7 +88,7 @@ class Chat(MDApp):
         try:
 
             sio.connect(
-                "https://classchat-fog5.onrender.com"
+                "http://192.168.43.55:5000"
             )
 
             sio.emit(
