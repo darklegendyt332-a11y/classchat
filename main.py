@@ -167,6 +167,21 @@ class Chat(MDApp):
 
             )
 
+        # =========================
+        # CALL REJECTED
+        # =========================
+
+        @sio.on("call_rejected")
+        def call_rejected(data):
+
+            Clock.schedule_once(
+
+                lambda dt:
+
+                self.call_rejected_ui()
+
+            )
+
     # =====================================
     # HOME
     # =====================================
@@ -610,7 +625,8 @@ class Chat(MDApp):
         )
 
         reject.bind(
-            on_press=self.reject_call
+            on_press=lambda x:
+            self.reject_call(caller)
         )
 
         accept.bind(
@@ -656,7 +672,21 @@ class Chat(MDApp):
     # REJECT CALL
     # =====================================
 
-    def reject_call(self, obj):
+    def reject_call(self, caller):
+
+        sio.emit(
+
+            "call_reject",
+
+            {
+
+                "from": MY_NUMBER,
+
+                "to": caller
+
+            }
+
+        )
 
         self.home()
 
@@ -717,6 +747,16 @@ class Chat(MDApp):
         layout.add_widget(end_call)
 
         self.screen.add_widget(layout)
+
+    # =====================================
+    # CALL REJECTED UI
+    # =====================================
+
+    def call_rejected_ui(self):
+
+        if hasattr(self, "chat_area"):
+
+            self.chat_area.text += "\n❌ Call Rejected\n\n"
 
     # =====================================
     # END CALL
