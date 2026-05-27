@@ -1,4 +1,3 @@
-
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -29,10 +28,10 @@ sio = socketio.Client()
 
 Window.size = (360, 640)
 
-MY_NUMBER = "8052055136"
+MY_NUMBER = "9261413387"
 
 users = [
-    {"name": "farhan", "number": "9261413387", "msg": "Hello", "time": "10:22 PM"},
+    {"name": "Ali", "number": "8052055136", "msg": "Hello", "time": "10:22 PM"},
     {"name": "Ahmed", "number": "2222222222", "msg": "Kaha ho", "time": "9:10 PM"},
     {"name": "Aman", "number": "3333333333", "msg": "Online", "time": "Yesterday"}
 ]
