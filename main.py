@@ -12,6 +12,7 @@ from kivymd.uix.list import (
 
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
+from kivy.clock import Clock
 
 import socketio
 import datetime
@@ -39,14 +40,14 @@ users = [
     {
         "name": "Farhan",
         "number": "9261413387",
-        "msg": "Hello",
-        "time": "10:22 PM"
+        "msg": "Online",
+        "time": "Now"
     },
 
     {
         "name": "Ahmed",
         "number": "2222222222",
-        "msg": "Kaha ho",
+        "msg": "Hello",
         "time": "9:10 PM"
     }
 
@@ -103,6 +104,10 @@ class Chat(MDApp):
 
     def setup_socket_events(self):
 
+        # =========================
+        # RECEIVE MESSAGE
+        # =========================
+
         @sio.on("private_message")
         def private_message(data):
 
@@ -114,49 +119,53 @@ class Chat(MDApp):
 
                 time = data["time"]
 
-                if hasattr(self, "chat_area"):
+                Clock.schedule_once(
 
-                    self.chat_area.text += (
+                    lambda dt:
 
-                        "👤 " +
-
-                        sender +
-
-                        ": " +
-
-                        text +
-
-                        "   ✓✓   " +
-
-                        time +
-
-                        "\n\n"
-
+                    self.add_message(
+                        sender,
+                        text,
+                        time
                     )
+
+                )
 
             except Exception as e:
 
                 print(e)
 
-        # =================================
+        # =========================
         # INCOMING CALL
-        # =================================
+        # =========================
 
         @sio.on("incoming_call")
         def incoming_call(data):
 
             caller = data["from"]
 
-            self.incoming_call_screen(caller)
+            Clock.schedule_once(
 
-        # =================================
+                lambda dt:
+
+                self.incoming_call_screen(caller)
+
+            )
+
+        # =========================
         # CALL ACCEPTED
-        # =================================
+        # =========================
 
         @sio.on("call_accepted")
         def call_accepted(data):
 
-            self.open_call_ui()
+            Clock.schedule_once(
+
+                lambda dt:
+
+                self.open_call_ui()
+
+            )
 
     # =====================================
     # HOME
@@ -203,6 +212,22 @@ class Chat(MDApp):
         layout.add_widget(top)
 
         # =================================
+        # SEARCH
+        # =================================
+
+        search = MDTextField(
+
+            hint_text="Search",
+
+            size_hint_x=0.95,
+
+            pos_hint={"center_x": 0.5}
+
+        )
+
+        layout.add_widget(search)
+
+        # =================================
         # CHAT LIST
         # =================================
 
@@ -241,7 +266,20 @@ class Chat(MDApp):
 
         layout.add_widget(scroll)
 
+        fab = MDFloatingActionButton(
+
+            icon="message-plus",
+
+            pos_hint={
+                "center_x": 0.88,
+                "center_y": 0.08
+            }
+
+        )
+
         self.screen.add_widget(layout)
+
+        self.screen.add_widget(fab)
 
     # =====================================
     # OPEN CHAT
@@ -292,6 +330,14 @@ class Chat(MDApp):
         )
 
         # =================================
+        # VIDEO BUTTON
+        # =================================
+
+        video = MDFloatingActionButton(
+            icon="video"
+        )
+
+        # =================================
         # CALL BUTTON
         # =================================
 
@@ -306,6 +352,8 @@ class Chat(MDApp):
         top.add_widget(back)
 
         top.add_widget(title)
+
+        top.add_widget(video)
 
         top.add_widget(call)
 
@@ -330,7 +378,7 @@ class Chat(MDApp):
         layout.add_widget(scroll)
 
         # =================================
-        # BOTTOM
+        # BOTTOM BAR
         # =================================
 
         bottom = MDBoxLayout(
@@ -341,6 +389,18 @@ class Chat(MDApp):
 
             padding=5
 
+        )
+
+        emoji = MDFloatingActionButton(
+            icon="emoticon"
+        )
+
+        attach = MDFloatingActionButton(
+            icon="paperclip"
+        )
+
+        camera = MDFloatingActionButton(
+            icon="camera"
         )
 
         self.msg = MDTextField(
@@ -355,13 +415,51 @@ class Chat(MDApp):
             on_press=self.send_message
         )
 
+        mic = MDFloatingActionButton(
+            icon="microphone"
+        )
+
+        bottom.add_widget(emoji)
+
+        bottom.add_widget(attach)
+
+        bottom.add_widget(camera)
+
         bottom.add_widget(self.msg)
 
         bottom.add_widget(send)
 
+        bottom.add_widget(mic)
+
         layout.add_widget(bottom)
 
         self.screen.add_widget(layout)
+
+    # =====================================
+    # ADD MESSAGE
+    # =====================================
+
+    def add_message(self, sender, text, time):
+
+        if hasattr(self, "chat_area"):
+
+            self.chat_area.text += (
+
+                "👤 " +
+
+                sender +
+
+                ": " +
+
+                text +
+
+                "   ✓✓   " +
+
+                time +
+
+                "\n\n"
+
+            )
 
     # =====================================
     # SEND MESSAGE
@@ -432,7 +530,13 @@ class Chat(MDApp):
         )
 
         self.chat_area.text += (
-            "\n📞 Calling...\n\n"
+
+            "\n📞 Calling " +
+
+            self.current_user +
+
+            "...\n\n"
+
         )
 
     # =====================================
@@ -453,7 +557,6 @@ class Chat(MDApp):
 
         )
 
-
         title = MDLabel(
 
             text=f"📞 {caller} Calling...",
@@ -464,17 +567,27 @@ class Chat(MDApp):
 
         )
 
+        subtitle = MDLabel(
+
+            text="Incoming Voice Call",
+
+            halign="center"
+
+        )
+
         buttons = MDBoxLayout(
 
             adaptive_height=True,
 
-            spacing=50,
+            spacing=60,
 
             pos_hint={"center_x": 0.5}
 
         )
 
-        # RED BUTTON
+        # =================================
+        # REJECT
+        # =================================
 
         reject = MDFloatingActionButton(
 
@@ -482,10 +595,11 @@ class Chat(MDApp):
 
             md_bg_color=(1, 0, 0, 1)
 
-
         )
 
-        # GREEN BUTTON
+        # =================================
+        # ACCEPT
+        # =================================
 
         accept = MDFloatingActionButton(
 
@@ -509,6 +623,8 @@ class Chat(MDApp):
         buttons.add_widget(accept)
 
         layout.add_widget(title)
+
+        layout.add_widget(subtitle)
 
         layout.add_widget(buttons)
 
@@ -572,6 +688,14 @@ class Chat(MDApp):
 
         )
 
+        subtitle = MDLabel(
+
+            text="Voice Call Running...",
+
+            halign="center"
+
+        )
+
         end_call = MDFloatingActionButton(
 
             icon="phone-hangup",
@@ -587,6 +711,8 @@ class Chat(MDApp):
         )
 
         layout.add_widget(title)
+
+        layout.add_widget(subtitle)
 
         layout.add_widget(end_call)
 
