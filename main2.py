@@ -15,29 +15,46 @@ from kivy.core.window import Window
 
 import socketio
 import datetime
-import threading
-import asyncio
 
-from aiortc import RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaPlayer, MediaRecorder
-
-# =========================
+# =========================================
 # SOCKET
-# =========================
+# =========================================
+
 sio = socketio.Client()
 
 Window.size = (360, 640)
 
+# =========================================
+# YOUR NUMBER
+# =========================================
+
 MY_NUMBER = "9261413387"
 
+# =========================================
+# CONTACTS
+# =========================================
+
 users = [
-    {"name": "Ali", "number": "8052055136", "msg": "Hello", "time": "10:22 PM"},
-    {"name": "Ahmed", "number": "2222222222", "msg": "Kaha ho", "time": "9:10 PM"},
-    {"name": "Aman", "number": "3333333333", "msg": "Online", "time": "Yesterday"}
+
+    {
+        "name": "Ali",
+        "number": "8052055136",
+        "msg": "Hello",
+        "time": "10:22 PM"
+    },
+
+    {
+        "name": "Ahmed",
+        "number": "2222222222",
+        "msg": "Kaha ho",
+        "time": "9:10 PM"
+    }
+
 ]
 
-pc = None
-
+# =========================================
+# APP
+# =========================================
 
 class Chat(MDApp):
 
@@ -49,260 +66,549 @@ class Chat(MDApp):
         self.current_user = ""
         self.current_number = ""
 
+        # =================================
+        # SOCKET CONNECT
+        # =================================
+
         try:
-            sio.connect("https://classchat-fog5.onrender.com")
-            sio.emit("join", {"number": MY_NUMBER})
+
+            sio.connect(
+                "https://classchat-fog5.onrender.com"
+            )
+
+            sio.emit(
+                "join",
+                {
+                    "number": MY_NUMBER
+                }
+            )
+
             print("Connected ✔")
+
         except Exception as e:
+
             print("Socket Error:", e)
 
         self.screen = MDScreen()
+
+        self.setup_socket_events()
+
         self.home()
+
         return self.screen
 
-    # =========================
+    # =====================================
+    # SOCKET EVENTS
+    # =====================================
+
+    def setup_socket_events(self):
+
+        @sio.on("private_message")
+        def private_message(data):
+
+            try:
+
+                sender = data["sender"]
+
+                text = data["text"]
+
+                time = data["time"]
+
+                if hasattr(self, "chat_area"):
+
+                    self.chat_area.text += (
+
+                        "👤 " +
+
+                        sender +
+
+                        ": " +
+
+                        text +
+
+                        "   ✓✓   " +
+
+                        time +
+
+                        "\n\n"
+
+                    )
+
+            except Exception as e:
+
+                print(e)
+
+        # =================================
+        # INCOMING CALL
+        # =================================
+
+        @sio.on("incoming_call")
+        def incoming_call(data):
+
+            caller = data["from"]
+
+            self.incoming_call_screen(caller)
+
+        # =================================
+        # CALL ACCEPTED
+        # =================================
+
+        @sio.on("call_accepted")
+        def call_accepted(data):
+
+            self.open_call_ui()
+
+    # =====================================
     # HOME
-    # =========================
+    # =====================================
+
     def home(self):
+
         self.screen.clear_widgets()
 
-        layout = MDBoxLayout(orientation="vertical")
+        layout = MDBoxLayout(
+            orientation="vertical"
+        )
 
-        top = MDBoxLayout(adaptive_height=True, padding=15, spacing=10)
-        title = MDLabel(text="Class Chat", font_style="H4")
-        camera = MDFloatingActionButton(icon="camera")
+        # =================================
+        # TOP BAR
+        # =================================
+
+        top = MDBoxLayout(
+
+            adaptive_height=True,
+
+            padding=15,
+
+            spacing=10
+
+        )
+
+        title = MDLabel(
+
+            text="Class Chat",
+
+            font_style="H4"
+
+        )
+
+        camera = MDFloatingActionButton(
+            icon="camera"
+        )
 
         top.add_widget(title)
+
         top.add_widget(camera)
+
         layout.add_widget(top)
 
+        # =================================
+        # CHAT LIST
+        # =================================
+
         scroll = ScrollView()
+
         chat_list = MDList()
 
         for user in users:
+
             item = TwoLineAvatarIconListItem(
+
                 text=user["name"],
-                secondary_text=user["msg"] + " ✓✓ " + user["time"]
+
+                secondary_text=
+                user["msg"] +
+                "   ✓✓   " +
+                user["time"]
+
             )
+
             item.number = user["number"]
 
-            icon = IconLeftWidget(icon="account-circle")
+            icon = IconLeftWidget(
+                icon="account-circle"
+            )
+
             item.add_widget(icon)
 
-            item.bind(on_press=self.open_chat)
+            item.bind(
+                on_press=self.open_chat
+            )
+
             chat_list.add_widget(item)
 
         scroll.add_widget(chat_list)
+
         layout.add_widget(scroll)
 
-        fab = MDFloatingActionButton(
-            icon="message-plus",
-            pos_hint={"center_x": 0.88, "center_y": 0.08}
-        )
-
         self.screen.add_widget(layout)
-        self.screen.add_widget(fab)
 
-    # =========================
+    # =====================================
     # OPEN CHAT
-    # =========================
+    # =====================================
+
     def open_chat(self, instance):
 
         self.current_user = instance.text
+
         self.current_number = instance.number
 
         self.screen.clear_widgets()
 
-        layout = MDBoxLayout(orientation="vertical")
-
-        top = MDBoxLayout(adaptive_height=True, padding=10, spacing=10)
-
-        back = MDFloatingActionButton(icon="arrow-left")
-        back.bind(on_press=self.back)
-
-        title = MDLabel(
-            text=self.current_user + " 🟢 Online",
-            font_style="H6"
+        layout = MDBoxLayout(
+            orientation="vertical"
         )
 
-        video = MDFloatingActionButton(icon="video")
-        call = MDFloatingActionButton(icon="phone")
+        # =================================
+        # TOP BAR
+        # =================================
 
-        call.bind(on_press=self.start_call)
-        video.bind(on_press=self.start_video_call)
+        top = MDBoxLayout(
+
+            adaptive_height=True,
+
+            padding=10,
+
+            spacing=10
+
+        )
+
+        back = MDFloatingActionButton(
+            icon="arrow-left"
+        )
+
+        back.bind(
+            on_press=self.back
+        )
+
+        title = MDLabel(
+
+            text=
+            self.current_user +
+            " 🟢 Online",
+
+            font_style="H6"
+
+        )
+
+        # =================================
+        # CALL BUTTON
+        # =================================
+
+        call = MDFloatingActionButton(
+            icon="phone"
+        )
+
+        call.bind(
+            on_press=self.start_call
+        )
 
         top.add_widget(back)
+
         top.add_widget(title)
-        top.add_widget(video)
+
         top.add_widget(call)
 
         layout.add_widget(top)
 
+        # =================================
+        # CHAT AREA
+        # =================================
+
         self.chat_area = MDLabel(
+
             text="💬 Welcome To Class Chat\n\n",
+
             halign="left"
+
         )
 
         scroll = ScrollView()
+
         scroll.add_widget(self.chat_area)
+
         layout.add_widget(scroll)
 
-        @sio.on("private_message")
-        def private_message(data):
-            self.chat_area.text += f"👤 {data['sender']}: {data['text']} ✓✓ {data['time']}\n\n"
+        # =================================
+        # BOTTOM
+        # =================================
 
-        @sio.on("incoming_call")
-        def incoming_call(data):
-            self.chat_area.text += f"\n📞 Incoming call from {data['from']}\n"
+        bottom = MDBoxLayout(
 
-        @sio.on("call_accepted")
-        def call_accepted(data):
-            self.chat_area.text += "\n📲 Call Accepted\n"
+            adaptive_height=True,
 
-        bottom = MDBoxLayout(adaptive_height=True, spacing=5, padding=5)
+            spacing=5,
 
-        self.msg = MDTextField(hint_text="Message")
+            padding=5
 
-        send = MDFloatingActionButton(icon="send")
-        send.bind(on_press=self.send_message)
+        )
+
+        self.msg = MDTextField(
+            hint_text="Message"
+        )
+
+        send = MDFloatingActionButton(
+            icon="send"
+        )
+
+        send.bind(
+            on_press=self.send_message
+        )
 
         bottom.add_widget(self.msg)
+
         bottom.add_widget(send)
 
         layout.add_widget(bottom)
 
         self.screen.add_widget(layout)
 
-    # =========================
-    # CHAT SEND
-    # =========================
+    # =====================================
+    # SEND MESSAGE
+    # =====================================
+
     def send_message(self, obj):
 
         text = self.msg.text
+
         if text.strip() == "":
             return
 
-        time = datetime.datetime.now().strftime("%I:%M %p")
+        time = datetime.datetime.now().strftime(
+            "%I:%M %p"
+        )
 
-        sio.emit("private_message", {
+        data = {
+
             "sender": MY_NUMBER,
-            "receiver": self.current_number,
-            "text": text,
-            "time": time
-        })
 
-        self.chat_area.text += f"🧑 You: {text} ✓✓ {time}\n\n"
+            "receiver": self.current_number,
+
+            "text": text,
+
+            "time": time
+
+        }
+
+        sio.emit(
+            "private_message",
+            data
+        )
+
+        self.chat_area.text += (
+
+            "🧑 You: " +
+
+            text +
+
+            "   ✓✓   " +
+
+            time +
+
+            "\n\n"
+
+        )
+
         self.msg.text = ""
 
-    # =========================
-    # 📞 CALL REQUEST
-    # =========================
+    # =====================================
+    # START CALL
+    # =====================================
+
     def start_call(self, obj):
 
-        sio.emit("call_request", {
-            "from": MY_NUMBER,
-            "to": self.current_number,
-            "type": "audio"
-        })
+        sio.emit(
 
-        threading.Thread(target=self.create_offer, daemon=True).start()
+            "call_request",
 
-        self.chat_area.text += "\n📞 Starting voice call...\n"
+            {
 
-    def start_video_call(self, obj):
-        sio.emit("call_request", {
-            "from": MY_NUMBER,
-            "to": self.current_number,
-            "type": "video"
-        })
-
-    # =========================
-    # 🌐 WEBRTC OFFER (REAL CALL START)
-    # =========================
-    def create_offer(self):
-
-        global pc
-        pc = RTCPeerConnection()
-
-        player = MediaPlayer(None)  # microphone
-
-        if player and player.audio:
-            pc.addTrack(player.audio)
-
-        async def run():
-            offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-
-            sio.emit("offer", {
                 "from": MY_NUMBER,
-                "to": self.current_number,
-                "sdp": pc.localDescription.sdp,
-                "type": pc.localDescription.type
-            })
 
-        asyncio.run(run())
+                "to": self.current_number
 
-    # =========================
-    # 📲 RECEIVE OFFER
-    # =========================
-    @sio.on("offer")
-    def on_offer(data):
+            }
 
-        async def handle():
+        )
 
-            global pc
-            pc = RTCPeerConnection()
+        self.chat_area.text += (
+            "\n📞 Calling...\n\n"
+        )
 
-            desc = RTCSessionDescription(
-                sdp=data["sdp"],
-                type=data["type"]
-            )
+    # =====================================
+    # INCOMING CALL SCREEN
+    # =====================================
 
-            await pc.setRemoteDescription(desc)
+    def incoming_call_screen(self, caller):
 
-            recorder = MediaRecorder("default")
+        self.screen.clear_widgets()
 
-            @pc.on("track")
-            def on_track(track):
-                recorder.addTrack(track)
+        layout = MDBoxLayout(
 
-            await recorder.start()
+            orientation="vertical",
 
-            answer = await pc.createAnswer()
-            await pc.setLocalDescription(answer)
+            spacing=40,
 
-            sio.emit("answer", {
+            padding=40
+
+        )
+
+        title = MDLabel(
+
+            text=f"📞 {caller} Calling...",
+
+            halign="center",
+
+            font_style="H4"
+
+        )
+
+        buttons = MDBoxLayout(
+
+            adaptive_height=True,
+
+            spacing=50,
+
+            pos_hint={"center_x": 0.5}
+
+        )
+
+        # RED BUTTON
+
+        reject = MDFloatingActionButton(
+
+            icon="phone-hangup",
+
+            md_bg_color=(1, 0, 0, 1)
+
+        )
+
+        # GREEN BUTTON
+
+        accept = MDFloatingActionButton(
+
+            icon="phone",
+
+            md_bg_color=(0, 1, 0, 1)
+
+        )
+
+        reject.bind(
+            on_press=self.reject_call
+        )
+
+        accept.bind(
+            on_press=lambda x:
+            self.accept_call(caller)
+        )
+
+        buttons.add_widget(reject)
+
+        buttons.add_widget(accept)
+
+        layout.add_widget(title)
+
+        layout.add_widget(buttons)
+
+        self.screen.add_widget(layout)
+
+    # =====================================
+    # ACCEPT CALL
+    # =====================================
+
+    def accept_call(self, caller):
+
+
+        sio.emit(
+
+            "call_accept",
+
+            {
+
                 "from": MY_NUMBER,
-                "to": data["from"],
-                "sdp": pc.localDescription.sdp,
-                "type": pc.localDescription.type
-            })
 
-        asyncio.run(handle())
+                "to": caller
 
-    # =========================
-    # 📡 ANSWER RECEIVE
-    # =========================
-    @sio.on("answer")
-    def on_answer(data):
+            }
 
-        async def handle():
-            global pc
+        )
 
-            desc = RTCSessionDescription(
-                sdp=data["sdp"],
-                type=data["type"]
-            )
+        self.open_call_ui()
 
-            await pc.setRemoteDescription(desc)
+    # =====================================
+    # REJECT CALL
+    # =====================================
 
-        asyncio.run(handle())
+    def reject_call(self, obj):
 
-    # =========================
-    # BACK
-    # =========================
-    def back(self, obj):
         self.home()
 
+    # =====================================
+    # CALL UI
+    # =====================================
+
+    def open_call_ui(self):
+
+        self.screen.clear_widgets()
+
+        layout = MDBoxLayout(
+
+            orientation="vertical",
+
+            spacing=40,
+
+            padding=40
+
+        )
+
+        title = MDLabel(
+
+            text="📞 Call Connected",
+
+            halign="center",
+
+            font_style="H4"
+
+        )
+
+        end_call = MDFloatingActionButton(
+
+            icon="phone-hangup",
+
+            md_bg_color=(1, 0, 0, 1),
+
+            pos_hint={"center_x": 0.5}
+
+        )
+
+        end_call.bind(
+            on_press=self.end_call
+        )
+
+        layout.add_widget(title)
+
+        layout.add_widget(end_call)
+
+        self.screen.add_widget(layout)
+
+    # =====================================
+    # END CALL
+    # =====================================
+
+    def end_call(self, obj):
+
+        self.home()
+
+    # =====================================
+    # BACK
+    # =====================================
+
+    def back(self, obj):
+
+        self.home()
+
+# =========================================
+# RUN
+# =========================================
 
 Chat().run()
