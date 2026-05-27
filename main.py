@@ -143,7 +143,7 @@ class Chat(MDApp):
             json.dump(self.messages, file)
 
     # =====================================
-    # ADD MESSAGE STORAGE
+    # STORE MESSAGE
     # =====================================
 
     def store_message(self, user, msg):
@@ -180,15 +180,10 @@ class Chat(MDApp):
                 message = (
 
                     "👤 " +
-
                     sender +
-
                     ": " +
-
                     text +
-
                     "   ✓✓   " +
-
                     time
 
                 )
@@ -196,16 +191,12 @@ class Chat(MDApp):
                 self.store_message(sender, message)
 
                 Clock.schedule_once(
-
-                    lambda dt:
-
-                    self.add_message_ui(message)
-
+                    lambda dt: self.safe_add_message(message)
                 )
 
             except Exception as e:
 
-                print(e)
+                print("Receive Error:", e)
 
         # =================================
         # INCOMING CALL
@@ -281,10 +272,6 @@ class Chat(MDApp):
             orientation="vertical"
         )
 
-        # =================================
-        # TOP BAR
-        # =================================
-
         top = MDBoxLayout(
 
             adaptive_height=True,
@@ -313,10 +300,6 @@ class Chat(MDApp):
 
         layout.add_widget(top)
 
-        # =================================
-        # SEARCH
-        # =================================
-
         search = MDTextField(
 
             hint_text="Search",
@@ -328,10 +311,6 @@ class Chat(MDApp):
         )
 
         layout.add_widget(search)
-
-        # =================================
-        # CHAT LIST
-        # =================================
 
         scroll = ScrollView()
 
@@ -399,10 +378,6 @@ class Chat(MDApp):
             orientation="vertical"
         )
 
-        # =================================
-        # TOP BAR
-        # =================================
-
         top = MDBoxLayout(
 
             adaptive_height=True,
@@ -431,17 +406,9 @@ class Chat(MDApp):
 
         )
 
-        # =================================
-        # VIDEO BUTTON
-        # =================================
-
         video = MDFloatingActionButton(
             icon="video"
         )
-
-        # =================================
-        # CALL BUTTON
-        # =================================
 
         call = MDFloatingActionButton(
             icon="phone"
@@ -461,10 +428,6 @@ class Chat(MDApp):
 
         layout.add_widget(top)
 
-        # =================================
-        # CHAT AREA
-        # =================================
-
         self.chat_area = MDLabel(
 
             text="",
@@ -473,9 +436,7 @@ class Chat(MDApp):
 
         )
 
-        # =================================
-        # LOAD OLD MESSAGES
-        # =================================
+        # LOAD OLD CHAT
 
         if self.current_number in self.messages:
 
@@ -488,10 +449,6 @@ class Chat(MDApp):
         scroll.add_widget(self.chat_area)
 
         layout.add_widget(scroll)
-
-        # =================================
-        # BOTTOM BAR
-        # =================================
 
         bottom = MDBoxLayout(
 
@@ -548,14 +505,22 @@ class Chat(MDApp):
         self.screen.add_widget(layout)
 
     # =====================================
-    # ADD MESSAGE UI
+    # SAFE MESSAGE UI
     # =====================================
 
-    def add_message_ui(self, message):
+    def safe_add_message(self, message):
 
-        if hasattr(self, "chat_area"):
+        try:
 
-            self.chat_area.text += message + "\n\n"
+            if hasattr(self, "chat_area"):
+
+                self.chat_area.text += (
+                    message + "\n\n"
+                )
+
+        except Exception as e:
+
+            print("UI Error:", e)
 
     # =====================================
     # SEND MESSAGE
@@ -563,58 +528,64 @@ class Chat(MDApp):
 
     def send_message(self, obj):
 
-        text = self.msg.text
+        try:
 
-        if text.strip() == "":
-            return
+            text = self.msg.text
 
-        time = datetime.datetime.now().strftime(
-            "%I:%M %p"
-        )
+            if text.strip() == "":
+                return
 
-        data = {
+            time = datetime.datetime.now().strftime(
+                "%I:%M %p"
+            )
 
-            "sender": MY_NUMBER,
+            data = {
 
-            "receiver": self.current_number,
+                "sender": MY_NUMBER,
 
-            "text": text,
+                "receiver": self.current_number,
 
-            "time": time
+                "text": text,
 
-        }
+                "time": time
 
-        sio.emit(
-            "private_message",
-            data
-        )
+            }
 
-        message = (
+            sio.emit(
+                "private_message",
+                data
+            )
 
-            "🧑 You: " +
+            message = (
 
-            text +
+                "🧑 You: " +
 
-            "   ✓✓   " +
+                text +
 
-            time
+                "   ✓✓   " +
 
-        )
+                time
 
-        self.store_message(
-            self.current_number,
-            message
-        )
+            )
 
-        self.chat_area.text += (
+            self.store_message(
+                self.current_number,
+                message
+            )
 
-            message +
+            if hasattr(self, "chat_area"):
 
-            "\n\n"
+                self.chat_area.text += (
+                    message + "\n\n"
+                )
 
-        )
+            self.msg.text = ""
 
-        self.msg.text = ""
+            print("Message Sent ✔")
+
+        except Exception as e:
+
+            print("Send Error:", e)
 
     # =====================================
     # START CALL
@@ -692,10 +663,6 @@ class Chat(MDApp):
 
         )
 
-        # =================================
-        # REJECT
-        # =================================
-
         reject = MDFloatingActionButton(
 
             icon="phone-hangup",
@@ -703,10 +670,6 @@ class Chat(MDApp):
             md_bg_color=(1, 0, 0, 1)
 
         )
-
-        # =================================
-        # ACCEPT
-        # =================================
 
         accept = MDFloatingActionButton(
 
@@ -846,9 +809,15 @@ class Chat(MDApp):
 
     def call_rejected_ui(self):
 
-        if hasattr(self, "chat_area"):
+        try:
 
-            self.chat_area.text += "\n❌ Call Rejected\n\n"
+            if hasattr(self, "chat_area"):
+
+                self.chat_area.text += "\n❌ Call Rejected\n\n"
+
+        except Exception as e:
+
+            print(e)
 
     # =====================================
     # END CALL

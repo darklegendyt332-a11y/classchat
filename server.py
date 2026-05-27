@@ -1,10 +1,8 @@
 from flask import Flask, request
-from flask_socketio import SocketIO, emit, join_room
-import json
-import os
+from flask_socketio import SocketIO, emit
 
 # =========================================
-# APP
+# FLASK
 # =========================================
 
 app = Flask(__name__)
@@ -15,7 +13,9 @@ socketio = SocketIO(
 
     app,
 
-    cors_allowed_origins="*"
+    cors_allowed_origins="*",
+
+    async_mode="threading"
 
 )
 
@@ -23,75 +23,52 @@ socketio = SocketIO(
 # USERS
 # =========================================
 
-online_users = {}
+connected_users = {}
 
 # =========================================
-# CREATE MESSAGE FILE
+# CONNECT
 # =========================================
 
-if not os.path.exists("messages.json"):
+@socketio.on("connect")
+def connect():
 
-    with open("messages.json", "w") as f:
-
-        json.dump([], f)
-
-# =========================================
-# SAVE MESSAGE
-# =========================================
-
-def save_message(data):
-
-    with open("messages.json", "r") as f:
-
-        messages = json.load(f)
-
-    messages.append(data)
-
-    with open("messages.json", "w") as f:
-
-        json.dump(messages, f)
+    print("User Connected ✔")
 
 # =========================================
-# HOME
+# DISCONNECT
 # =========================================
 
-@app.route("/")
-def home():
+@socketio.on("disconnect")
+def disconnect():
 
-    return "Class Chat Server Running ✔"
+    remove = None
+
+    for number, sid in connected_users.items():
+
+        if sid == request.sid:
+
+            remove = number
+
+            break
+
+    if remove:
+
+        del connected_users[remove]
+
+        print(remove, "Disconnected ❌")
 
 # =========================================
-# USER JOIN
+# JOIN
 # =========================================
 
 @socketio.on("join")
 def join(data):
 
-    try:
+    number = data.get("number")
 
-        number = data["number"]
+    connected_users[number] = request.sid
 
-        online_users[number] = request.sid
-
-        join_room(number)
-
-        print(f"{number} joined ✔")
-
-        emit(
-
-            "user_online",
-
-            {
-                "number": number
-            },
-
-            broadcast=True
-
-        )
-
-    except Exception as e:
-
-        print("Join Error:", e)
+    print(number, "Joined ✔")
 
 # =========================================
 # PRIVATE MESSAGE
@@ -102,84 +79,55 @@ def private_message(data):
 
     try:
 
-        receiver = data["receiver"]
+        receiver = data.get("receiver")
 
-        # SAVE MESSAGE
-        save_message(data)
+        sender = data.get("sender")
 
-        # SEND REALTIME
+        text = data.get("text")
+
+        time = data.get("time")
+
+        print(f"{sender} -> {receiver}: {text}")
+
+        # ================================
+        # SEND TO RECEIVER
+        # ================================
+
+        if receiver in connected_users:
+
+            emit(
+
+                "private_message",
+
+                {
+                    "sender": sender,
+                    "text": text,
+                    "time": time
+                },
+
+                to=connected_users[receiver]
+
+            )
+
+        # ================================
+        # DELIVERY STATUS
+        # ================================
+
         emit(
 
-            "private_message",
+            "message_sent",
 
-            data,
+            {
+                "status": "success"
+            },
 
-            room=receiver
-
-        )
-
-        print(
-
-            f"MSG {data['sender']} -> {receiver}"
+            to=request.sid
 
         )
 
     except Exception as e:
 
         print("Message Error:", e)
-
-# =========================================
-# GET OLD MESSAGES
-# =========================================
-
-@socketio.on("get_messages")
-def get_messages(data):
-
-    try:
-
-        user1 = data["user1"]
-
-        user2 = data["user2"]
-
-        with open("messages.json", "r") as f:
-
-            messages = json.load(f)
-
-        chat = []
-
-        for msg in messages:
-
-            if (
-
-                (
-                    msg["sender"] == user1
-                    and
-                    msg["receiver"] == user2
-                )
-
-                or
-
-                (
-                    msg["sender"] == user2
-                    and
-                    msg["receiver"] == user1
-                )
-
-            ):
-
-                chat.append(msg)
-
-        emit(
-
-            "old_messages",
-
-            chat
-
-        )
-
-    except Exception as e:
-
-        print("Get Messages Error:", e)
 
 # =========================================
 # CALL REQUEST
@@ -190,21 +138,25 @@ def call_request(data):
 
     try:
 
-        emit(
+        caller = data.get("from")
 
-            "incoming_call",
+        receiver = data.get("to")
 
-            data,
+        print(f"Call Request {caller} -> {receiver}")
 
-            room=data["to"]
+        if receiver in connected_users:
 
-        )
+            emit(
 
-        print(
+                "incoming_call",
 
-            f"CALL {data['from']} -> {data['to']}"
+                {
+                    "from": caller
+                },
 
-        )
+                to=connected_users[receiver]
+
+            )
 
     except Exception as e:
 
@@ -219,21 +171,25 @@ def call_accept(data):
 
     try:
 
-        emit(
+        caller = data.get("to")
 
-            "call_accepted",
+        accepter = data.get("from")
 
-            data,
+        print(f"Call Accepted {accepter}")
 
-            room=data["to"]
+        if caller in connected_users:
 
-        )
+            emit(
 
-        print(
+                "call_accepted",
 
-            f"CALL ACCEPTED {data['from']}"
+                {
+                    "from": accepter
+                },
 
-        )
+                to=connected_users[caller]
+
+            )
 
     except Exception as e:
 
@@ -248,21 +204,25 @@ def call_reject(data):
 
     try:
 
-        emit(
+        caller = data.get("to")
 
-            "call_rejected",
+        rejecter = data.get("from")
 
-            data,
+        print(f"Call Rejected {rejecter}")
 
-            room=data["to"]
+        if caller in connected_users:
 
-        )
+            emit(
 
-        print(
+                "call_rejected",
 
-            f"CALL REJECTED {data['from']}"
+                {
+                    "from": rejecter
+                },
 
-        )
+                to=connected_users[caller]
+
+            )
 
     except Exception as e:
 
@@ -277,118 +237,48 @@ def end_call(data):
 
     try:
 
-        emit(
+        receiver = data.get("to")
 
-            "call_ended",
+        sender = data.get("from")
 
-            data,
+        print(f"Call Ended {sender}")
 
-            room=data["to"]
+        if receiver in connected_users:
 
-        )
+            emit(
 
-        print(
+                "call_ended",
 
-            f"CALL ENDED {data['from']}"
+                {
+                    "from": sender
+                },
 
-        )
+                to=connected_users[receiver]
+
+            )
 
     except Exception as e:
 
         print("End Call Error:", e)
 
 # =========================================
-# TYPING
+# HOME ROUTE
 # =========================================
 
-@socketio.on("typing")
-def typing(data):
+@app.route("/")
+def home():
 
-    try:
-
-        emit(
-
-            "typing",
-
-            data,
-
-            room=data["to"]
-
-        )
-
-    except Exception as e:
-
-        print("Typing Error:", e)
-
-# =========================================
-# STOP TYPING
-# =========================================
-
-@socketio.on("stop_typing")
-def stop_typing(data):
-
-    try:
-
-        emit(
-
-            "stop_typing",
-
-            data,
-
-            room=data["to"]
-
-        )
-
-    except Exception as e:
-
-        print("Stop Typing Error:", e)
-
-# =========================================
-# DISCONNECT
-# =========================================
-
-@socketio.on("disconnect")
-def disconnect():
-
-    try:
-
-        disconnected_user = None
-
-        for number, sid in online_users.items():
-
-            if sid == request.sid:
-
-                disconnected_user = number
-
-                break
-
-        if disconnected_user:
-
-            del online_users[disconnected_user]
-
-            print(f"{disconnected_user} disconnected ❌")
-
-            emit(
-
-                "user_offline",
-
-                {
-                    "number": disconnected_user
-                },
-
-                broadcast=True
-
-            )
-
-    except Exception as e:
-
-        print("Disconnect Error:", e)
+    return "Class Chat Server Running ✔"
 
 # =========================================
 # RUN SERVER
 # =========================================
 
 if __name__ == "__main__":
+
+    print("=================================")
+    print(" Class Chat Server Started ✔ ")
+    print("=================================")
 
     socketio.run(
 
