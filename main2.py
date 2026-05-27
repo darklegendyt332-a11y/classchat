@@ -16,6 +16,8 @@ from kivy.clock import Clock
 
 import socketio
 import datetime
+import json
+import os
 
 # =========================================
 # SOCKET
@@ -29,7 +31,7 @@ Window.size = (360, 640)
 # YOUR NUMBER
 # =========================================
 
-MY_NUMBER = "9261413387"
+MY_NUMBER = "8052055136"
 
 # =========================================
 # CONTACTS
@@ -39,7 +41,7 @@ users = [
 
     {
         "name": "Farhan",
-        "number": "8052055136",
+        "number": "9261413387",
         "msg": "Online",
         "time": "Now"
     },
@@ -54,10 +56,20 @@ users = [
 ]
 
 # =========================================
+# SAVE FILE
+# =========================================
+
+CHAT_FILE = "messages.json"
+
+# =========================================
 # APP
 # =========================================
 
 class Chat(MDApp):
+
+    # =====================================
+    # BUILD
+    # =====================================
 
     def build(self):
 
@@ -66,6 +78,8 @@ class Chat(MDApp):
 
         self.current_user = ""
         self.current_number = ""
+
+        self.messages = self.load_messages()
 
         # =================================
         # SOCKET CONNECT
@@ -99,14 +113,58 @@ class Chat(MDApp):
         return self.screen
 
     # =====================================
+    # LOAD MESSAGES
+    # =====================================
+
+    def load_messages(self):
+
+        if os.path.exists(CHAT_FILE):
+
+            try:
+
+                with open(CHAT_FILE, "r") as file:
+
+                    return json.load(file)
+
+            except:
+
+                return {}
+
+        return {}
+
+    # =====================================
+    # SAVE MESSAGES
+    # =====================================
+
+    def save_messages(self):
+
+        with open(CHAT_FILE, "w") as file:
+
+            json.dump(self.messages, file)
+
+    # =====================================
+    # ADD MESSAGE STORAGE
+    # =====================================
+
+    def store_message(self, user, msg):
+
+        if user not in self.messages:
+
+            self.messages[user] = []
+
+        self.messages[user].append(msg)
+
+        self.save_messages()
+
+    # =====================================
     # SOCKET EVENTS
     # =====================================
 
     def setup_socket_events(self):
 
-        # =========================
+        # =================================
         # RECEIVE MESSAGE
-        # =========================
+        # =================================
 
         @sio.on("private_message")
         def private_message(data):
@@ -119,15 +177,29 @@ class Chat(MDApp):
 
                 time = data["time"]
 
+                message = (
+
+                    "👤 " +
+
+                    sender +
+
+                    ": " +
+
+                    text +
+
+                    "   ✓✓   " +
+
+                    time
+
+                )
+
+                self.store_message(sender, message)
+
                 Clock.schedule_once(
 
                     lambda dt:
 
-                    self.add_message(
-                        sender,
-                        text,
-                        time
-                    )
+                    self.add_message_ui(message)
 
                 )
 
@@ -135,9 +207,9 @@ class Chat(MDApp):
 
                 print(e)
 
-        # =========================
+        # =================================
         # INCOMING CALL
-        # =========================
+        # =================================
 
         @sio.on("incoming_call")
         def incoming_call(data):
@@ -152,9 +224,9 @@ class Chat(MDApp):
 
             )
 
-        # =========================
+        # =================================
         # CALL ACCEPTED
-        # =========================
+        # =================================
 
         @sio.on("call_accepted")
         def call_accepted(data):
@@ -167,9 +239,9 @@ class Chat(MDApp):
 
             )
 
-        # =========================
+        # =================================
         # CALL REJECTED
-        # =========================
+        # =================================
 
         @sio.on("call_rejected")
         def call_rejected(data):
@@ -179,6 +251,21 @@ class Chat(MDApp):
                 lambda dt:
 
                 self.call_rejected_ui()
+
+            )
+
+        # =================================
+        # CALL ENDED
+        # =================================
+
+        @sio.on("call_ended")
+        def call_ended(data):
+
+            Clock.schedule_once(
+
+                lambda dt:
+
+                self.home()
 
             )
 
@@ -380,11 +467,21 @@ class Chat(MDApp):
 
         self.chat_area = MDLabel(
 
-            text="💬 Welcome To Class Chat\n\n",
+            text="",
 
             halign="left"
 
         )
+
+        # =================================
+        # LOAD OLD MESSAGES
+        # =================================
+
+        if self.current_number in self.messages:
+
+            for msg in self.messages[self.current_number]:
+
+                self.chat_area.text += msg + "\n\n"
 
         scroll = ScrollView()
 
@@ -451,30 +548,14 @@ class Chat(MDApp):
         self.screen.add_widget(layout)
 
     # =====================================
-    # ADD MESSAGE
+    # ADD MESSAGE UI
     # =====================================
 
-    def add_message(self, sender, text, time):
+    def add_message_ui(self, message):
 
         if hasattr(self, "chat_area"):
 
-            self.chat_area.text += (
-
-                "👤 " +
-
-                sender +
-
-                ": " +
-
-                text +
-
-                "   ✓✓   " +
-
-                time +
-
-                "\n\n"
-
-            )
+            self.chat_area.text += message + "\n\n"
 
     # =====================================
     # SEND MESSAGE
@@ -508,7 +589,7 @@ class Chat(MDApp):
             data
         )
 
-        self.chat_area.text += (
+        message = (
 
             "🧑 You: " +
 
@@ -516,7 +597,18 @@ class Chat(MDApp):
 
             "   ✓✓   " +
 
-            time +
+            time
+
+        )
+
+        self.store_message(
+            self.current_number,
+            message
+        )
+
+        self.chat_area.text += (
+
+            message +
 
             "\n\n"
 
@@ -763,6 +855,20 @@ class Chat(MDApp):
     # =====================================
 
     def end_call(self, obj):
+
+        sio.emit(
+
+            "end_call",
+
+            {
+
+                "from": MY_NUMBER,
+
+                "to": self.current_number
+
+            }
+
+        )
 
         self.home()
 

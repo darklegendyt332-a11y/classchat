@@ -1,5 +1,7 @@
 from flask import Flask, request
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room
+import json
+import os
 
 # =========================================
 # APP
@@ -22,6 +24,32 @@ socketio = SocketIO(
 # =========================================
 
 online_users = {}
+
+# =========================================
+# CREATE MESSAGE FILE
+# =========================================
+
+if not os.path.exists("messages.json"):
+
+    with open("messages.json", "w") as f:
+
+        json.dump([], f)
+
+# =========================================
+# SAVE MESSAGE
+# =========================================
+
+def save_message(data):
+
+    with open("messages.json", "r") as f:
+
+        messages = json.load(f)
+
+    messages.append(data)
+
+    with open("messages.json", "w") as f:
+
+        json.dump(messages, f)
 
 # =========================================
 # HOME
@@ -76,6 +104,10 @@ def private_message(data):
 
         receiver = data["receiver"]
 
+        # SAVE MESSAGE
+        save_message(data)
+
+        # SEND REALTIME
         emit(
 
             "private_message",
@@ -95,6 +127,59 @@ def private_message(data):
     except Exception as e:
 
         print("Message Error:", e)
+
+# =========================================
+# GET OLD MESSAGES
+# =========================================
+
+@socketio.on("get_messages")
+def get_messages(data):
+
+    try:
+
+        user1 = data["user1"]
+
+        user2 = data["user2"]
+
+        with open("messages.json", "r") as f:
+
+            messages = json.load(f)
+
+        chat = []
+
+        for msg in messages:
+
+            if (
+
+                (
+                    msg["sender"] == user1
+                    and
+                    msg["receiver"] == user2
+                )
+
+                or
+
+                (
+                    msg["sender"] == user2
+                    and
+                    msg["receiver"] == user1
+                )
+
+            ):
+
+                chat.append(msg)
+
+        emit(
+
+            "old_messages",
+
+            chat
+
+        )
+
+    except Exception as e:
+
+        print("Get Messages Error:", e)
 
 # =========================================
 # CALL REQUEST
